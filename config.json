@@ -1,0 +1,25 @@
+{
+  "tempos": {
+    "foco_min": 25,
+    "pausa_curta_min": 5,
+    "pausa_longa_min": 15,
+    "ciclos_ate_pausa_longa": 4
+  },
+  "servidor": {
+    "host": "0.0.0.0",
+    "porta": "${SERVER_PORT}",
+    "ip_notebook": "${NOTEBOOK_IP}"
+  },
+  "alexa": {
+    "habilitado": false,
+    "notify_me_url": "https://api.notifymyecho.com/v1/NotifyMe",
+    "access_code": "${ALEXA_ACCESS_CODE}"
+  },
+  "push": {
+    "habilitado": false,
+    "servico": "ntfy",
+    "ntfy_topico_url": "${NTFY_TOPIC_URL}",
+    "pushover_token": "${PUSHOVER_TOKEN}",
+    "pushover_user": "${PUSHOVER_USER}"
+  }
+}

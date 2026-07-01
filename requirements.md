@@ -33,7 +33,7 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 - **RF06** — Ao fim de cada ciclo, disparar requisição HTTP à skill de notificação da Alexa ("Notify Me").
 - **RF07** — A Alexa deve anunciar em voz alta a transição (ex.: "Hora da pausa" / "Hora de focar").
 
-### Feedback háptico e dashboard (Protótipo 4)
+### Feedback háptico (Protótipo 4)
 - **RF08** — Em paralelo ao aviso por voz, enviar notificação push (ntfy/Pushover) espelhada ao smartwatch, gerando vibração no pulso.
 - **RF09** — Iniciar um ciclo a partir do smartwatch (atalho → HTTP POST ao orquestrador) — fluxo bidirecional.
 
@@ -66,7 +66,7 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 
 **Software**
 - Python 3
-- Bibliotecas: `requests` (chamadas HTTP), `Flask` (API/servidor + dashboard)
+- Bibliotecas: `requests` (chamadas HTTP), `Flask` (API/servidor local)
 - Skill Alexa "Notify Me"
 - Serviço de push: ntfy **ou** Pushover
 
@@ -78,7 +78,6 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 - **Saída → Alexa:** HTTP request à API da skill "Notify Me" (requer token de acesso).
 - **Saída → Push:** HTTP request ao ntfy/Pushover (tópico/canal configurado no app do smartwatch).
 - **Entrada ← Smartwatch:** HTTP POST do atalho/Tasker para a API local.
-- **Dashboard:** página HTML servida pelo Flask, consumida por navegador.
 
 ---
 
