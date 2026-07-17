@@ -1,0 +1,125 @@
+{
+  "info": {
+    "_postman_id": "3370a00b-b4ee-48aa-92c4-1eff8cd33775",
+    "name": "Pomodoro Ubíquo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "28777769"
+  },
+  "item": [
+    {
+      "name": "Get state",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{localhost_url}}/state",
+          "host": [
+            "{{localhost_url}}"
+          ],
+          "path": [
+            "state"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Start session",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{localhost_url}}/start",
+          "host": [
+            "{{localhost_url}}"
+          ],
+          "path": [
+            "start"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Pause",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{localhost_url}}/pause",
+          "host": [
+            "{{localhost_url}}"
+          ],
+          "path": [
+            "pause"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Resume",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{localhost_url}}/resume",
+          "host": [
+            "{{localhost_url}}"
+          ],
+          "path": [
+            "resume"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "End session",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{localhost_url}}/stop",
+          "host": [
+            "{{localhost_url}}"
+          ],
+          "path": [
+            "stop"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "localhost_url",
+      "value": ""
+    }
+  ]
+}
