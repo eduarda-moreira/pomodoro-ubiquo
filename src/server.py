@@ -19,8 +19,9 @@ from typing import Optional
 
 from flask import Flask, jsonify
 
+from alexa import announce_voice
 from config import load_config
-from timer import MESSAGES, PomodoroTimer
+from timer import MESSAGES, PAUSE_MESSAGE, PAUSED, RESUME_MESSAGE, RUNNING, PomodoroTimer
 
 TICK_INTERVAL_SEC = 0.5
 
@@ -31,8 +32,14 @@ app = Flask(__name__)
 _lock = threading.Lock()
 
 
+def speak(message: str) -> None:
+    print(f">>> {message}")
+    if not announce_voice(message):
+        print(">>> [Alexa] Aviso de voz falhou; ciclo continua normalmente.")
+
+
 def announce(_previous: Optional[str], next_period: str) -> None:
-    print(f">>> {MESSAGES[next_period]}")
+    speak(MESSAGES[next_period])
 
 
 timer = PomodoroTimer(cfg, on_transition=announce)
@@ -62,14 +69,18 @@ def post_start():
 @app.post("/pause")
 def post_pause():
     with _lock:
-        timer.pause()
+        if timer.status == RUNNING:
+            timer.pause()
+            speak(PAUSE_MESSAGE)
         return jsonify(timer.state())
 
 
 @app.post("/resume")
 def post_resume():
     with _lock:
-        timer.resume()
+        if timer.status == PAUSED:
+            timer.resume()
+            speak(RESUME_MESSAGE)
         return jsonify(timer.state())
 
 

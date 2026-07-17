@@ -18,10 +18,15 @@ from typing import Optional
 
 from alexa import announce_voice
 from config import load_config
-from timer import PAUSED, RUNNING, STOPPED, MESSAGES, PomodoroTimer
-
-PAUSE_MESSAGE = "Pausando"
-RESUME_MESSAGE = "Retomando"
+from timer import (
+    MESSAGES,
+    PAUSE_MESSAGE,
+    PAUSED,
+    RESUME_MESSAGE,
+    RUNNING,
+    STOPPED,
+    PomodoroTimer,
+)
 
 
 def format_time(seconds: int) -> str:

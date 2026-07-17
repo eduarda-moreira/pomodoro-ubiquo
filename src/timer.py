@@ -27,6 +27,10 @@ MESSAGES = {
     LONG_BREAK: "Faça uma pausa longa",
 }
 
+# Anúncios para comandos manuais
+PAUSE_MESSAGE = "Pausando"
+RESUME_MESSAGE = "Retomando"
+
 
 class PomodoroTimer:
     """
