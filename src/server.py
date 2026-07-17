@@ -21,6 +21,7 @@ from flask import Flask, jsonify
 
 from alexa import announce_voice
 from config import load_config
+from ntfy import notify
 from timer import MESSAGES, PAUSE_MESSAGE, PAUSED, RESUME_MESSAGE, RUNNING, PomodoroTimer
 
 TICK_INTERVAL_SEC = 0.5
@@ -36,6 +37,8 @@ def speak(message: str) -> None:
     print(f">>> {message}")
     if not announce_voice(message):
         print(">>> [Alexa] Aviso de voz falhou; ciclo continua normalmente.")
+    if not notify(message):
+        print(">>> [ntfy] Aviso de push falhou; ciclo continua normalmente.")
 
 
 def announce(_previous: Optional[str], next_period: str) -> None:
