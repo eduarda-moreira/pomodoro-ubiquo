@@ -1,77 +1,87 @@
-"""Protótipo 1 — execução local do timer no terminal.
-
-Roda o ciclo Pomodoro no notebook, exibindo a contagem regressiva e as
-transições automáticas. Aceita comandos para pausar, retomar e encerrar.
-
-Uso:
-    ./venv/bin/python src/main.py
-
-Comandos (digite a letra e Enter):
-    p = pausar    r = retomar    e = encerrar    q = sair
-
-Dica de teste: para não esperar 25 min, use tempos curtos no config.json
-(ex.: "foco_min": 0.1  →  6 segundos).
 """
+EXECUÇÃO EM TERMINAL
+
+Executa o pomodoro no notebook, mostrando a contagem regressiva e as transições automáticas.
+
+Comandos
+    p = pausar
+    r = retomar
+    e = encerrar
+    q = sair
+"""
+
 from __future__ import annotations
 
 import threading
 import time
+from typing import Optional
 
-from config import carregar_config
-from timer import ENCERRADO, MENSAGENS, PomodoroTimer
+from alexa import announce_voice
+from config import load_config
+from timer import PAUSED, RUNNING, STOPPED, MESSAGES, PomodoroTimer
+
+PAUSE_MESSAGE = "Pausando"
+RESUME_MESSAGE = "Retomando"
 
 
-def formatar(segundos: int) -> str:
-    return f"{segundos // 60:02d}:{segundos % 60:02d}"
+def format_time(seconds: int) -> str:
+    return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
-def anunciar(_anterior: str, proximo: str) -> None:
-    # Ponto onde, nas Fases 3 e 4, entram os avisos de voz (Alexa) e vibração.
-    print(f"\n>>> {MENSAGENS[proximo]}\n")
+def speak(message: str) -> None:
+    print(f"\n>>> {message}\n")
+    if not announce_voice(message):
+        print(">>> [Alexa] Aviso de voz falhou; ciclo continua normalmente.\n")
+
+
+def announce(_previous: Optional[str], next_period: str) -> None:
+    speak(MESSAGES[next_period])
 
 
 def main() -> None:
-    cfg = carregar_config()
-    timer = PomodoroTimer(cfg, ao_transicionar=anunciar)
-    timer.iniciar()
+    cfg = load_config()
+    timer = PomodoroTimer(cfg, on_transition=announce)
+    timer.start()
 
     print("Pomodoro iniciado.  Comandos: [p]ausar  [r]etomar  [e]ncerrar  [q]sair")
-    parar = threading.Event()
+    stop_event = threading.Event()
 
-    def exibir() -> None:
-        while not parar.is_set():
-            timer.atualizar()
-            if timer.situacao == ENCERRADO:
+    def display() -> None:
+        while not stop_event.is_set():
+            timer.update()
+            if timer.status == STOPPED:
                 print("\nSessão encerrada.")
-                parar.set()
+                stop_event.set()
                 break
-            e = timer.estado()
+            state = timer.state()
             print(
-                f"\r[{e['situacao']:^8}] {(e['periodo'] or '-'):<11} "
-                f"{formatar(e['tempo_restante_seg'])}  (focos: {e['focos_completos']})   ",
+                f"\r[{state['status']:^8}] {(state['period'] or '-'):<11} "
+                f"{format_time(state['remaining_seconds'])}  (focos: {state['completed_focuses']})   ",
                 end="",
                 flush=True,
             )
             time.sleep(0.25)
 
-    thread = threading.Thread(target=exibir, daemon=True)
+    thread = threading.Thread(target=display, daemon=True)
     thread.start()
 
     try:
-        while not parar.is_set():
-            comando = input().strip().lower()
-            if comando == "p":
-                timer.pausar()
-            elif comando == "r":
-                timer.retomar()
-            elif comando == "e":
-                timer.encerrar()
-            elif comando == "q":
-                parar.set()
+        while not stop_event.is_set():
+            command = input().strip().lower()
+            if command == "p":
+                if timer.status == RUNNING:
+                    timer.pause()
+                    speak(PAUSE_MESSAGE)
+            elif command == "r":
+                if timer.status == PAUSED:
+                    timer.resume()
+                    speak(RESUME_MESSAGE)
+            elif command == "e":
+                timer.stop()
+            elif command == "q":
+                stop_event.set()
     except (EOFError, KeyboardInterrupt):
-        parar.set()
-
-    print("\nAté logo.")
+        stop_event.set()
 
 
 if __name__ == "__main__":

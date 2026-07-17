@@ -1,144 +1,134 @@
-"""Núcleo do Timer Pomodoro (Protótipo 1).
-
-Máquina de estados que gerencia os ciclos de foco e pausa, com controle de
-pausar / retomar / encerrar. Não depende de rede nem de terminal — é lógica
-pura, reutilizada pelo runner de terminal (Fase 1) e pelo servidor Flask (Fase 2).
-
-O tempo é medido por um "relógio" injetável (padrão: `time.monotonic`), o que
-permite testar as transições instantaneamente com um relógio falso.
 """
+CORE DO PROJETO
+
+Maquina de estados controla os ciclos de foco e pausa.
+Arquivo de lógica pura, reutilizado pelo runner de terminal e pelo servidor Flask.
+"""
+
 from __future__ import annotations
-
-import time
 from typing import Callable, Optional
+import time
 
-# Períodos
-FOCO = "foco"
-PAUSA_CURTA = "pausa_curta"
-PAUSA_LONGA = "pausa_longa"
+# Periodos
+FOCUS = "focus"
+SHORT_BREAK = "short_break"
+LONG_BREAK = "long_break"
 
-# Situações
-OCIOSO = "ocioso"
-RODANDO = "rodando"
-PAUSADO = "pausado"
-ENCERRADO = "encerrado"
+# Estados
+IDLE = "idle"
+RUNNING = "running"
+PAUSED = "paused"
+STOPPED = "stopped"
 
-# Anúncio de cada transição (usado pelo runner / futuras notificações)
-MENSAGENS = {
-    FOCO: "Hora de focar",
-    PAUSA_CURTA: "Hora da pausa",
-    PAUSA_LONGA: "Hora da pausa longa",
+# Mensagens
+MESSAGES = {
+    FOCUS: "Hora de focar",
+    SHORT_BREAK: "Faça uma pausa curta",
+    LONG_BREAK: "Faça uma pausa longa",
 }
 
 
 class PomodoroTimer:
-    """Controla um ciclo Pomodoro configurável.
-
-    `ao_transicionar(periodo_anterior, periodo_novo)` é chamado a cada troca
-    automática de período — ponto de extensão para os avisos de voz/vibração.
+    """
+    Controla os ciclos do pomodoro
     """
 
     def __init__(
         self,
         config: dict,
-        ao_transicionar: Optional[Callable[[str, str], None]] = None,
-        relogio: Callable[[], float] = time.monotonic,
+        on_transition: Optional[Callable[[Optional[str], str], None]] = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        tempos = config["tempos"]
-        # round evita truncamento por ponto flutuante em minutos fracionários
-        # usados em testes (ex.: 0.1 min → 6 s).
-        self._dur = {
-            FOCO: round(tempos["foco_min"] * 60),
-            PAUSA_CURTA: round(tempos["pausa_curta_min"] * 60),
-            PAUSA_LONGA: round(tempos["pausa_longa_min"] * 60),
+        timing = config["timing"]
+        self._duration = {
+            FOCUS: round(timing["focus_min"] * 60),
+            SHORT_BREAK: round(timing["short_break_min"] * 60),
+            LONG_BREAK: round(timing["long_break_min"] * 60),
         }
-        self._ciclos_ate_longa = int(tempos["ciclos_ate_pausa_longa"])
-        self._ao_transicionar = ao_transicionar
-        self._relogio = relogio
+        self._cycles_until_long_break = int(timing["cycles_until_long_break"])
+        self._on_transition = on_transition
+        self._clock = clock
 
-        self.situacao = OCIOSO
-        self.periodo: Optional[str] = None
-        self.focos_completos = 0
-        self._fim = 0.0             # instante (relógio) do fim, quando RODANDO
-        self._restante_pausado = 0  # segundos congelados, quando PAUSADO
+        self.status = IDLE
+        self.period: Optional[str] = None
+        self.completed_focuses = 0
+        self._end = 0.0
+        self._paused_remaining = 0
 
-    # ------------------------------------------------------------------ consultas
-    def _restante_raw(self) -> float:
-        """Segundos restantes como float (uso interno, sem arredondar)."""
-        if self.situacao == RODANDO:
-            return self._fim - self._relogio()
-        if self.situacao == PAUSADO:
-            return self._restante_pausado
+    # consultas
+    def _raw_remaining(self) -> float:
+        """Segundos restantes em float"""
+        if self.status == RUNNING:
+            return self._end - self._clock()
+        if self.status == PAUSED:
+            return self._paused_remaining
         return 0.0
 
-    def tempo_restante(self) -> int:
-        """Segundos restantes do período atual, arredondados para exibição."""
-        return max(0, int(round(self._restante_raw())))
+    def remaining_time(self) -> int:
+        """Segundos restantes do periodo atual"""
+        return max(0, int(round(self._raw_remaining())))
 
-    def estado(self) -> dict:
-        """Snapshot serializável do estado (base para o GET /estado da Fase 2)."""
+    def state(self) -> dict:
+        """Snapshot serializável do estado"""
         return {
-            "situacao": self.situacao,
-            "periodo": self.periodo,
-            "tempo_restante_seg": self.tempo_restante(),
-            "focos_completos": self.focos_completos,
+            "status": self.status,
+            "period": self.period,
+            "remaining_seconds": self.remaining_time(),
+            "completed_focuses": self.completed_focuses,
         }
 
-    # ------------------------------------------------------------------- comandos
-    def iniciar(self) -> None:
-        """Inicia a sessão a partir de um período de foco (RF05)."""
-        if self.situacao in (RODANDO, PAUSADO):
-            return  # já em andamento
-        self.focos_completos = 0
-        self._iniciar_periodo(FOCO)
-
-    def pausar(self) -> None:
-        """Congela a contagem do período atual (RF10)."""
-        if self.situacao != RODANDO:
+    # comandos
+    def start(self) -> None:
+        """Começa a sessão, iniciando o primeiro periodo de foco"""
+        if self.status in (RUNNING, PAUSED):
             return
-        self._restante_pausado = self._restante_raw()
-        self.situacao = PAUSADO
+        self.completed_focuses = 0
+        self._start_period(FOCUS)
+        if self._on_transition:
+            self._on_transition(None, FOCUS)
 
-    def retomar(self) -> None:
-        """Retoma do tempo em que foi pausado (RF11)."""
-        if self.situacao != PAUSADO:
+    def pause(self) -> None:
+        """Pausa o periodo atual, mantendo o tempo restante para retomar depois"""
+        if self.status != RUNNING:
             return
-        self._fim = self._relogio() + self._restante_pausado
-        self.situacao = RODANDO
+        self._paused_remaining = self._raw_remaining()
+        self.status = PAUSED
 
-    def encerrar(self) -> None:
-        """Encerra a sessão sem iniciar novo período (RF12)."""
-        self.situacao = ENCERRADO
-        self.periodo = None
+    def resume(self) -> None:
+        """Retoma o periodo pausado"""
+        if self.status != PAUSED:
+            return
+        self._end = self._clock() + self._paused_remaining
+        self.status = RUNNING
 
-    # --------------------------------------------------------------------- motor
-    def atualizar(self) -> None:
-        """Avança a máquina de estados; chame periodicamente.
+    def stop(self) -> None:
+        """Encerra a sessão sem iniciar um novo periodo"""
+        self.status = STOPPED
+        self.period = None
 
-        Quando o tempo do período em andamento chega a zero, faz a transição
-        automática para o próximo período (RF02).
-        """
-        if self.situacao == RODANDO and self._restante_raw() <= 0:
-            self._transicionar()
+    # engine
+    def update(self) -> None:
+        """Avança a maquina de estados quando o periodo atual termina"""
+        if self.status == RUNNING and self._raw_remaining() <= 0:
+            self._transition()
 
-    # ------------------------------------------------------------------ internos
-    def _iniciar_periodo(self, periodo: str) -> None:
-        self.periodo = periodo
-        self._fim = self._relogio() + self._dur[periodo]
-        self.situacao = RODANDO
+    # internos
+    def _start_period(self, period: str) -> None:
+        self.period = period
+        self._end = self._clock() + self._duration[period]
+        self.status = RUNNING
 
-    def _transicionar(self) -> None:
-        anterior = self.periodo
-        if anterior == FOCO:
-            self.focos_completos += 1
-            # Pausa longa a cada N focos; caso contrário, pausa curta.
-            if self.focos_completos % self._ciclos_ate_longa == 0:
-                proximo = PAUSA_LONGA
+    def _transition(self) -> None:
+        previous = self.period
+        if previous == FOCUS:
+            self.completed_focuses += 1
+            if self.completed_focuses % self._cycles_until_long_break == 0:
+                next_period = LONG_BREAK
             else:
-                proximo = PAUSA_CURTA
+                next_period = SHORT_BREAK
         else:
-            proximo = FOCO  # depois de qualquer pausa, volta ao foco
+            next_period = FOCUS
 
-        self._iniciar_periodo(proximo)
-        if self._ao_transicionar:
-            self._ao_transicionar(anterior, proximo)
+        self._start_period(next_period)
+        if self._on_transition:
+            self._on_transition(previous, next_period)

@@ -1,49 +1,47 @@
-"""Carregamento da configuração do Pomodoro Ubíquo.
-
-Lê os parâmetros de `config.json` (na raiz do projeto) e substitui os
-placeholders `${VAR}` pelos valores do ambiente, carregados do arquivo `.env`
-(não versionado). Assim, dados específicos da máquina/rede e segredos (IP do
-notebook, porta, tokens) ficam fora do `config.json` versionado.
 """
-from __future__ import annotations
+CONFIG SETUP
+Reads the parameters from `config.json` and substitutes the placeholders with
+the values from the environment in `.env`.
+"""
 
-import json
-import os
+from __future__ import annotations
 from pathlib import Path
 from string import Template
-
 from dotenv import load_dotenv
+import json
+import os
 
-# Raiz do projeto = pasta pai de /src
-RAIZ = Path(__file__).resolve().parent.parent
-
-# Campos que devem ser convertidos para inteiro após a substituição
-_CAMPOS_INTEIROS = {("servidor", "porta")}
-
-
-def _converter_inteiros(config: dict) -> None:
-    """Converte campos numéricos que vieram como texto do `.env`."""
-    for secao, chave in _CAMPOS_INTEIROS:
-        valor = config.get(secao, {}).get(chave)
-        if isinstance(valor, str) and valor.strip():
-            config[secao][chave] = int(valor)
+ROOT_DIR = Path(__file__).resolve().parent.parent
+_INTEGER_FIELDS = {("server", "port")}
 
 
-def carregar_config() -> dict:
-    """Retorna a configuração com os placeholders `${VAR}` já resolvidos."""
-    load_dotenv(RAIZ / ".env")
+def _convert_integers(config: dict) -> None:
+    """
+    Converts numeric fields that arrived as text.
+    """
+    for section, key in _INTEGER_FIELDS:
+        value = config.get(section, {}).get(key)
+        if isinstance(value, str) and value.strip():
+            config[section][key] = int(value)
 
-    texto = (RAIZ / "config.json").read_text(encoding="utf-8")
-    # `safe_substitute` mantém intactos placeholders sem variável definida
-    texto = Template(texto).safe_substitute(os.environ)
 
-    config = json.loads(texto)
-    _converter_inteiros(config)
+def load_config() -> dict:
+    """
+    Returns the configuration with the placeholders already resolved.
+    """
+
+    load_dotenv(ROOT_DIR / ".env")
+
+    text = (ROOT_DIR / "config.json").read_text(encoding="utf-8")
+    text = Template(text).safe_substitute(os.environ)
+
+    config = json.loads(text)
+    _convert_integers(config)
     return config
 
 
 if __name__ == "__main__":
-    cfg = carregar_config()
+    cfg = load_config()
     print("Configuração carregada com sucesso:")
-    print(f"  Servidor: {cfg['servidor']['host']}:{cfg['servidor']['porta']}")
-    print(f"  Tempos:   {cfg['tempos']}")
+    print(f"  Servidor: {cfg['server']['host']}:{cfg['server']['port']}")
+    print(f"  Tempos:   {cfg['timing']}")

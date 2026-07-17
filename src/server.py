@@ -1,101 +1,95 @@
-"""Protótipo 2 — Servidor local (Flask).
+"""
+LOCAL SERVER (Flask)
 
-Encapsula o núcleo do timer (src/timer.py) numa API HTTP acessível na rede
-Wi-Fi, permitindo que o smartwatch e outros dispositivos consultem o estado e
-controlem a sessão (iniciar / pausar / retomar / encerrar).
-
-Um thread em segundo plano avança a máquina de estados (`atualizar`) para que
-as transições foco↔pausa aconteçam automaticamente, mesmo sem requisições.
-
-Uso:
-    ./venv/bin/python src/server.py
+Encapsula timer.py em uma API HTTP acessível na rede Wi-Fi, permitindo que outros dispositivos consultem o estado e controlem a sessão (iniciar / pausar / retomar / encerrar)
 
 Endpoints:
-    GET  /estado    → estado atual (situação, período, tempo restante, focos)
-    POST /iniciar   → inicia a sessão
-    POST /pausar    → pausa o período atual
-    POST /retomar   → retoma o período pausado
-    POST /encerrar  → encerra a sessão
+    GET  /state   -> estado atual (status, period, remaining time, focuses)
+    POST /start   -> começa a sessão
+    POST /pause   -> pausa o periodo atual
+    POST /resume  -> retoma o periodo pausado
+    POST /stop    -> encerra a sessão
 """
+
 from __future__ import annotations
 
 import threading
 import time
+from typing import Optional
 
 from flask import Flask, jsonify
 
-from config import carregar_config
-from timer import MENSAGENS, PomodoroTimer
+from config import load_config
+from timer import MESSAGES, PomodoroTimer
 
-INTERVALO_TICK_SEG = 0.5
+TICK_INTERVAL_SEC = 0.5
 
-cfg = carregar_config()
+cfg = load_config()
 app = Flask(__name__)
 
-# Trava para serializar acesso ao timer entre o ticker e as requisições HTTP.
+# Lock para proteger o acesso ao timer entre threads (Flask + ticker)
 _lock = threading.Lock()
 
 
-def anunciar(_anterior: str, proximo: str) -> None:
-    # Gancho para os avisos de voz (Fase 3) e vibração (Fase 4).
-    print(f">>> {MENSAGENS[proximo]}")
+def announce(_previous: Optional[str], next_period: str) -> None:
+    print(f">>> {MESSAGES[next_period]}")
 
 
-timer = PomodoroTimer(cfg, ao_transicionar=anunciar)
+timer = PomodoroTimer(cfg, on_transition=announce)
 
 
 def _ticker() -> None:
-    """Avança a máquina de estados periodicamente (transições automáticas)."""
+    """Avança a máquina de estados"""
     while True:
         with _lock:
-            timer.atualizar()
-        time.sleep(INTERVALO_TICK_SEG)
+            timer.update()
+        time.sleep(TICK_INTERVAL_SEC)
 
 
-@app.get("/estado")
-def get_estado():
+@app.get("/state")
+def get_state():
     with _lock:
-        return jsonify(timer.estado())
+        return jsonify(timer.state())
 
 
-@app.post("/iniciar")
-def post_iniciar():
+@app.post("/start")
+def post_start():
     with _lock:
-        timer.iniciar()
-        return jsonify(timer.estado())
+        timer.start()
+        return jsonify(timer.state())
 
 
-@app.post("/pausar")
-def post_pausar():
+@app.post("/pause")
+def post_pause():
     with _lock:
-        timer.pausar()
-        return jsonify(timer.estado())
+        timer.pause()
+        return jsonify(timer.state())
 
 
-@app.post("/retomar")
-def post_retomar():
+@app.post("/resume")
+def post_resume():
     with _lock:
-        timer.retomar()
-        return jsonify(timer.estado())
+        timer.resume()
+        return jsonify(timer.state())
 
 
-@app.post("/encerrar")
-def post_encerrar():
+@app.post("/stop")
+def post_stop():
     with _lock:
-        timer.encerrar()
-        return jsonify(timer.estado())
+        timer.stop()
+        return jsonify(timer.state())
 
 
 def main() -> None:
-    servidor = cfg["servidor"]
-    # O ticker roda em daemon para as transições ocorrerem sem requisições.
+    server_cfg = cfg["server"]
+
     threading.Thread(target=_ticker, daemon=True).start()
     print(
-        f"Servidor Pomodoro em http://{servidor['ip_notebook']}:{servidor['porta']} "
-        f"(bind {servidor['host']})"
+        f"Servidor Pomodoro em http://{server_cfg['notebook_ip']}:{server_cfg['port']} "
+        f"(bind {server_cfg['host']})"
     )
-    # use_reloader=False evita iniciar dois tickers (o reloader duplica o processo).
-    app.run(host=servidor["host"], port=servidor["porta"], use_reloader=False)
+
+    app.run(host=server_cfg["host"], port=server_cfg["port"], use_reloader=False)
 
 
 if __name__ == "__main__":
