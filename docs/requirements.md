@@ -10,7 +10,7 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 | Orquestrador (notebook/Python) | Núcleo lógico; controla ciclos e dispara notificações |
 | Alexa (Echo) | Canal de voz (skill "Voice Monkey") |
 | Smartwatch (Apple/Galaxy Watch) | Canal háptico (vibração) + disparo de início via HTTP |
-| Serviço de push (ntfy/Pushover) | Intermediário de notificação para o pulso |
+| Serviço de push (ntfy) | Intermediário de notificação para o pulso |
 
 ---
 
@@ -30,12 +30,15 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 - **RF13** — Permitir **pausar, retomar e encerrar** a sessão remotamente via endpoints HTTP (POST).
 
 ### Interação por voz (Protótipo 3)
-- **RF06** — Ao fim de cada ciclo, disparar uma requisição HTTP GET simples à URL do "monkey" (dispositivo virtual) correspondente ao evento no Voice Monkey.
-- **RF07** — A Alexa deve anunciar em voz alta a transição (ex.: "Hora da pausa" / "Hora de focar"), via Rotina nativa configurada para reagir à ativação do monkey correspondente.
+- **RF06** — Ao iniciar a sessão e ao fim de cada período, disparar uma requisição HTTP POST ao endpoint de *Announcement* do Voice Monkey, enviando dinamicamente o texto a ser falado a cada chamada (não há um "monkey" fixo por evento).
+- **RF07** — A Alexa deve anunciar em voz alta a transição (ex.: "Faça uma pausa curta" / "Hora de focar"), através de um único dispositivo *Speaker* vinculado a uma Rotina nativa que abre a skill ao receber o anúncio.
+- **RF14** — Ao pausar ou retomar a sessão manualmente (via terminal ou endpoint HTTP), anunciar em voz alta a ação ("Pausando" / "Retomando").
 
 ### Feedback háptico (Protótipo 4)
-- **RF08** — Em paralelo ao aviso por voz, enviar notificação push (ntfy/Pushover) espelhada ao smartwatch, gerando vibração no pulso.
-- **RF09** — Iniciar um ciclo a partir do smartwatch (atalho → HTTP POST ao orquestrador) — fluxo bidirecional.
+- **RF08** — Em paralelo ao aviso por voz, publicar uma notificação no tópico **ntfy** do orquestrador (HTTP POST/PUT para `https://ntfy.sh/<topico>`); os apps ntfy instalados no iPhone e no Android, inscritos nesse tópico, exibem a notificação, que é espelhada nativamente para o Apple Watch e para o Galaxy Watch, gerando vibração no pulso — sem necessidade de app dedicado no relógio.
+- **RF09** — Iniciar um ciclo a partir do smartwatch, por um dos dois caminhos conforme o relógio — fluxo bidirecional:
+  - **Apple Watch:** app **Atalhos** nativo (ação "Obter Conteúdo de URL") chamando diretamente `POST /start` no orquestrador.
+  - **Galaxy Watch:** app **MacroDroid** (tier gratuito) no celular Android pareado, via seu companion Wear OS — uma macro disparada por um botão/complicação no relógio, com ação "HTTP Request" fazendo `POST /start` no orquestrador.
 
 ---
 
@@ -68,25 +71,28 @@ Sistema de gerenciamento de ciclos de foco/pausa (Técnica Pomodoro) com um **or
 - Python 3
 - Bibliotecas: `requests` (chamadas HTTP), `Flask` (API/servidor local)
 - Skill Alexa "Voice Monkey"
-- Serviço de push: ntfy **ou** Pushover
+- Serviço de push: ntfy
+- MacroDroid (Android/Wear OS, tier gratuito)
+- Atalhos (watchOS, nativo)
 
 ---
 
 ## 5. Interfaces Externas
 
 - **API REST local (Flask):** endpoints de estado (GET) e de acionamento (POST).
-- **Saída → Alexa:** HTTP GET à URL do "monkey" correspondente no Voice Monkey (um monkey por tipo de evento, ex.: hora-da-pausa, hora-de-focar, pausa-longa); a fala é configurada por uma Rotina nativa no app Alexa, sem servidor adicional.
-- **Saída → Push:** HTTP request ao ntfy/Pushover (tópico/canal configurado no app do smartwatch).
-- **Entrada ← Smartwatch:** HTTP POST do atalho/Tasker para a API local.
+- **Saída → Alexa:** HTTP POST ao endpoint de *Announcement* do Voice Monkey (`/announce`), com o texto a ser falado no corpo da requisição (dinâmico a cada chamada); um único *Speaker*, vinculado a uma Rotina nativa no app Alexa, atende a todos os anúncios da sessão, sem servidor adicional.
+- **Saída → Push:** HTTP POST/PUT ao tópico ntfy do orquestrador (`https://ntfy.sh/<topico>`); os apps ntfy no iPhone e no Android, inscritos no tópico, recebem a notificação e a espelham nativamente para o Apple Watch e o Galaxy Watch.
+- **Entrada ← Smartwatch:** HTTP POST para a API local, por um de dois caminhos: do app **Atalhos** do Apple Watch (ação "Obter Conteúdo de URL") ou de uma macro do **MacroDroid** disparada pelo companion Wear OS do Galaxy Watch (ação "HTTP Request"); ambos chamam os mesmos endpoints `POST /start`, `/pause`, `/resume`, `/stop`.
 
 ---
 
 ## 6. Restrições e Premissas
 
 - Todos os dispositivos na **mesma rede Wi-Fi local**; comunicação centrada no orquestrador.
-- Arquitetura deliberadamente **simples**, reaproveitando recursos nativos (sem app dedicado no relógio).
+- Arquitetura deliberadamente **simples**, reaproveitando recursos nativos (sem app dedicado no relógio) — a exceção prática é o **MacroDroid** no Galaxy Watch: como o Wear OS não tem um equivalente nativo ao Atalhos da Apple, um app leve é necessário para disparar o HTTP POST a partir do relógio.
 - Notebook precisa estar ligado e com o script em execução durante a sessão.
-- Dependência de serviços de terceiros (Voice Monkey, ntfy/Pushover) e de conta Alexa/IP estável na rede.
+- Dependência de serviços de terceiros (Voice Monkey, ntfy) e de conta Alexa/IP estável na rede.
+- **Custo zero**: o projeto é uma demonstração/feira sem orçamento, então todo serviço/app externo usado (Voice Monkey, ntfy, MacroDroid, Atalhos) precisa ter um tier gratuito que atenda ao escopo da demo — nenhuma assinatura paga é aceitável.
 - Desenvolvimento **incremental e iterativo** em 4 protótipos como marcos.
 
 ---
@@ -124,29 +130,32 @@ Funcionalidade: Pausar e retomar a sessão
   Quero pausar e retomar o Pomodoro durante um período de foco ou de pausa
   Para lidar com uma interrupção sem perder o tempo já decorrido
 
-  # RF10, RF13
+  # RF10, RF13, RF14
   Cenário: Pausar durante um período de foco
     Dado que um ciclo de foco está em andamento com 18:42 restantes
     Quando o usuário aciona o atalho "Pausar" no relógio
     Então o orquestrador recebe a requisição HTTP POST de pausa
     E a contagem do tempo é congelada em 18:42
     E o estado do sistema passa a "pausado"
+    E a Alexa anuncia em voz alta "Pausando"
 
-  # RF10, RF13
+  # RF10, RF13, RF14
   Cenário: Pausar durante um período de pausa
     Dado que uma pausa curta está em andamento com 03:10 restantes
     Quando o usuário aciona o atalho "Pausar" no relógio
     Então o orquestrador recebe a requisição HTTP POST de pausa
     E a contagem do tempo é congelada em 03:10
     E o estado do sistema passa a "pausado"
+    E a Alexa anuncia em voz alta "Pausando"
 
-  # RF11, RF13
+  # RF11, RF13, RF14
   Cenário: Retomar a sessão pausada
     Dado que a sessão está pausada com tempo restante congelado
     Quando o usuário aciona o atalho "Retomar" no relógio
     Então o orquestrador recebe a requisição HTTP POST de retomada
     E a contagem volta a decrescer a partir do tempo congelado
     E o estado do sistema passa a "rodando"
+    E a Alexa anuncia em voz alta "Retomando"
 ```
 
 ### Funcionalidade: Encerrar a sessão
@@ -195,9 +204,9 @@ Funcionalidade: Avisar o término do ciclo de foco
   Cenário: Transição de foco para pausa com aviso multissensorial
     Dado que um ciclo de foco de 25 minutos está em andamento
     Quando a contagem do foco chega ao fim
-    Então o orquestrador dispara uma requisição HTTP GET ao monkey correspondente no Voice Monkey
-    E a Alexa anuncia em voz alta "Hora da pausa"
-    E uma notificação push é enviada ao smartwatch, gerando vibração no pulso
+    Então o orquestrador dispara um HTTP POST ao endpoint de Announcement do Voice Monkey
+    E a Alexa anuncia em voz alta "Faça uma pausa curta"
+    E uma notificação é publicada no tópico ntfy e espelhada ao smartwatch, gerando vibração no pulso
     E a pausa curta de 5 minutos é iniciada automaticamente
 ```
 
@@ -213,9 +222,9 @@ Funcionalidade: Avisar o término da pausa
   Cenário: Transição de pausa para foco com aviso multissensorial
     Dado que uma pausa curta de 5 minutos está em andamento
     Quando a contagem da pausa chega ao fim
-    Então o orquestrador dispara uma requisição HTTP GET ao monkey correspondente no Voice Monkey
+    Então o orquestrador dispara um HTTP POST ao endpoint de Announcement do Voice Monkey
     E a Alexa anuncia em voz alta "Hora de focar"
-    E uma notificação push é enviada ao smartwatch, gerando vibração no pulso
+    E uma notificação é publicada no tópico ntfy e espelhada ao smartwatch, gerando vibração no pulso
     E um novo ciclo de foco de 25 minutos é iniciado automaticamente
 ```
 
@@ -233,7 +242,7 @@ Funcionalidade: Encadear ciclos automaticamente
     Quando o quarto ciclo de foco chega ao fim
     Então o orquestrador inicia uma pausa longa de 15 minutos
     E a Alexa anuncia "Hora da pausa longa"
-    E o smartwatch vibra no pulso
+    E uma notificação é publicada no tópico ntfy e o smartwatch vibra no pulso
 ```
 
 ### Funcionalidade: Robustez de comunicação (cenários de exceção)
@@ -250,7 +259,7 @@ Funcionalidade: Robustez de comunicação
     E a Alexa está offline ou não responde
     Quando o orquestrador tenta enviar o aviso de voz
     Então o aviso por voz falha sem interromper o ciclo
-    E o smartwatch ainda vibra no pulso
+    E a notificação ntfy ainda é publicada e o smartwatch vibra no pulso
     E o próximo período é iniciado normalmente
 
   # RNF03
