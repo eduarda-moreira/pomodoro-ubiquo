@@ -11,9 +11,11 @@
     "ip_notebook": "${NOTEBOOK_IP}"
   },
   "alexa": {
-    "habilitado": false,
-    "notify_me_url": "https://api.notifymyecho.com/v1/NotifyMe",
-    "access_code": "${ALEXA_ACCESS_CODE}"
+    "habilitado": true,
+    "token": "${VOICEMONKEY_TOKEN}",
+    "device": "${VOICEMONKEY_DEVICE_ID}",
+    "voice": "Camila",
+    "language": "pt-BR"
   },
   "push": {
     "habilitado": false,
