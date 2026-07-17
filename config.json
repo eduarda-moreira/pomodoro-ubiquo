@@ -1,26 +1,26 @@
 {
-  "tempos": {
-    "foco_min": 25,
-    "pausa_curta_min": 5,
-    "pausa_longa_min": 15,
-    "ciclos_ate_pausa_longa": 4
+  "timing": {
+    "focus_min": 0.3,
+    "short_break_min": 0.1,
+    "long_break_min": 0.2,
+    "cycles_until_long_break": 2
   },
-  "servidor": {
+  "server": {
     "host": "0.0.0.0",
-    "porta": "${SERVER_PORT}",
-    "ip_notebook": "${NOTEBOOK_IP}"
+    "port": "${SERVER_PORT}",
+    "notebook_ip": "${NOTEBOOK_IP}"
   },
   "alexa": {
-    "habilitado": true,
+    "enabled": true,
     "token": "${VOICEMONKEY_TOKEN}",
     "device": "${VOICEMONKEY_DEVICE_ID}",
     "voice": "Camila",
     "language": "pt-BR"
   },
   "push": {
-    "habilitado": false,
-    "servico": "ntfy",
-    "ntfy_topico_url": "${NTFY_TOPIC_URL}",
+    "enabled": false,
+    "service": "ntfy",
+    "ntfy_topic_url": "${NTFY_TOPIC_URL}",
     "pushover_token": "${PUSHOVER_TOKEN}",
     "pushover_user": "${PUSHOVER_USER}"
   }
