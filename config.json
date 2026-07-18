@@ -1,6 +1,6 @@
 {
   "timing": {
-    "focus_min": 0.3,
+    "focus_min": 0.5,
     "short_break_min": 0.1,
     "long_break_min": 0.2,
     "cycles_until_long_break": 2
@@ -18,10 +18,7 @@
     "language": "pt-BR"
   },
   "push": {
-    "enabled": false,
-    "service": "ntfy",
-    "ntfy_topic_url": "${NTFY_TOPIC_URL}",
-    "pushover_token": "${PUSHOVER_TOKEN}",
-    "pushover_user": "${PUSHOVER_USER}"
+    "enabled": true,
+    "ntfy_topic_url": "${NTFY_TOPIC_URL}"
   }
 }
