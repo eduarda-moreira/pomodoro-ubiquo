@@ -7,8 +7,8 @@ Os apps ntfy inscritos no tópico (iPhone/Android) recebem a notificação e a e
 Endpoint: POST <ntfy_topic_url>  (ver https://docs.ntfy.sh/publish/)
 """
 
-import requests
 from __future__ import annotations
+import requests
 from config import load_config
 
 TIMEOUT_SEC = 5
